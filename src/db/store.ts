@@ -27,7 +27,17 @@ function getSql() {
         "DATABASE_URL n'est pas défini. Copie .env.local.example en .env.local et renseigne ta connection string Supabase."
       );
     }
-    global.__pgClient = postgres(url, { ssl: { rejectUnauthorized: false }, max: 1 });
+    // Parse manuellement pour éviter les problèmes d'encodage URL (ex: @ dans le mot de passe)
+    const parsed = new URL(url);
+    global.__pgClient = postgres({
+      host: parsed.hostname,
+      port: parseInt(parsed.port) || 6543,
+      database: parsed.pathname.replace(/^\//, ""),
+      username: decodeURIComponent(parsed.username),
+      password: decodeURIComponent(parsed.password),
+      ssl: { rejectUnauthorized: false },
+      max: 1,
+    });
   }
   return global.__pgClient;
 }
