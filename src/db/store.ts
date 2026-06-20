@@ -27,7 +27,7 @@ function getSql() {
         "DATABASE_URL n'est pas défini. Copie .env.local.example en .env.local et renseigne ta connection string Supabase."
       );
     }
-    global.__pgClient = postgres(url, { ssl: "require", max: 1 });
+    global.__pgClient = postgres(url, { ssl: { rejectUnauthorized: false }, max: 1 });
   }
   return global.__pgClient;
 }
