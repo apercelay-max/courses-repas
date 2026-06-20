@@ -36,7 +36,7 @@ export async function GET() {
       rowCount = parseInt(countRows[0].cnt);
       if (rowCount > 0) {
         const sample = await sql`SELECT jsonb_object_keys(data) as k FROM app_state WHERE id = 1 LIMIT 20`;
-        dataKeys = sample.map((r: { k: string }) => r.k);
+        dataKeys = sample.map((r) => r.k as string);
       }
     }
 
