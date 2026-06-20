@@ -55,7 +55,7 @@ async function ensureAppState(sql: ReturnType<typeof postgres>) {
 
   const rows = await sql`select 1 from app_state where id = 1`;
   if (rows.length === 0) {
-    await sql`insert into app_state (id, data) values (1, ${JSON.stringify(initialData)}::jsonb)`;
+    await sql`insert into app_state (id, data) values (1, ${initialData})`;
   }
 
   global.__appStateEnsured = true;
@@ -71,7 +71,7 @@ export async function readDB(): Promise<Database> {
 export async function writeDB(db: Database): Promise<void> {
   const sql = getSql();
   await ensureAppState(sql);
-  await sql`update app_state set data = ${JSON.stringify(db)}::jsonb, updated_at = now() where id = 1`;
+  await sql`update app_state set data = ${db}, updated_at = now() where id = 1`;
 }
 
 export function genId(prefix: string): string {
