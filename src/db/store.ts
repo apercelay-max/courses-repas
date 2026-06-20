@@ -62,7 +62,8 @@ export async function readDB(): Promise<Database> {
     return initialData;
   }
 
-  return JSON.parse(rows[0].data_json as string) as Database;
+  const raw = JSON.parse(rows[0].data_json as string);
+  return (typeof raw === "string" ? JSON.parse(raw) : raw) as Database;
 }
 
 export async function writeDB(db: Database): Promise<void> {
