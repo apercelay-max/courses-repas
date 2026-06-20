@@ -65,8 +65,11 @@ async function ensureAppState(sql: ReturnType<typeof postgres>) {
 export async function readDB(): Promise<Database> {
   const sql = getSql();
   await ensureAppState(sql);
-  const rows = await sql<{ data: Database }[]>`select data from app_state where id = 1`;
-  return rows[0].data;
+  const rows = await sql<{ data: unknown }[]>`select data from app_state where id = 1`;
+  if (rows.length === 0) throw new Error("app_state row manquante");
+  const raw = rows[0].data;
+  // postgres.js devrait auto-parser le JSONB, mais au cas où il renvoie une string
+  return (typeof raw === "string" ? JSON.parse(raw) : raw) as Database;
 }
 
 export async function writeDB(db: Database): Promise<void> {
