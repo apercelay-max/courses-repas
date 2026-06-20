@@ -37,6 +37,7 @@ function getSql() {
       password: decodeURIComponent(parsed.password),
       ssl: { rejectUnauthorized: false },
       max: 1,
+      prepare: false, // requis pour le Transaction pooler Supabase
     });
   }
   return global.__pgClient;
