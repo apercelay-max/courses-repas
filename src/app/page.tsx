@@ -1,4 +1,5 @@
 import Link from "next/link";
+import HomeVoiceButton from "@/components/HomeVoiceButton";
 import { readDB } from "@/db/store";
 import { computeShoppingLists } from "@/lib/shoppingList";
 
@@ -44,6 +45,8 @@ export default async function HomePage() {
           </Link>
         ))}
       </div>
+
+      <HomeVoiceButton />
 
       <div className="bg-white rounded-xl border border-slate-200 p-4">
         <h2 className="font-semibold mb-2">Comment ça marche</h2>
