@@ -1,5 +1,7 @@
 "use client";
 
+import VoiceInventoryInput from "@/components/VoiceInventoryInput";
+
 import { useEffect, useState } from "react";
 
 interface InventoryItem {
@@ -85,6 +87,8 @@ export default function InventairePage() {
   return (
     <div className="space-y-6">
       <h1 className="text-2xl font-bold">Inventaire</h1>
+
+      <VoiceInventoryInput onDone={load} />
 
       <form onSubmit={addItem} className="bg-white rounded-xl border border-slate-200 p-4 flex flex-wrap gap-3 items-end">
         <div className="flex flex-col">
