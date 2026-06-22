@@ -3,7 +3,7 @@
 // dépendance native. Migration vers Postgres/Supabase : il suffit de
 // recréer ces tables avec les mêmes colonnes (cf. spec-app-courses-repas.md).
 
-export type Location = "frigo" | "placard";
+export type Location = "frigo" | "placard" | "congelateur";
 
 export interface Ingredient {
   id: string;

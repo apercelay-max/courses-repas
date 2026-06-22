@@ -8,7 +8,7 @@ interface InventoryItem {
   id: string;
   ingredientId: string;
   ingredientName: string;
-  location: "frigo" | "placard";
+  location: "frigo" | "placard" | "congelateur";
   quantity: number;
   unit: string;
   expiryDate: string | null;
@@ -31,7 +31,7 @@ export default function InventairePage() {
     ingredientName: "",
     quantity: "",
     unit: "g",
-    location: "frigo" as "frigo" | "placard",
+    location: "frigo" as "frigo" | "placard" | "congelateur",
     expiryDate: "",
   });
 
@@ -83,6 +83,7 @@ export default function InventairePage() {
 
   const frigo = items.filter((i) => i.location === "frigo");
   const placard = items.filter((i) => i.location === "placard");
+  const congelateur = items.filter((i) => i.location === "congelateur");
 
   return (
     <div className="space-y-6">
@@ -136,11 +137,12 @@ export default function InventairePage() {
           <label className="text-xs text-slate-500 mb-1">Emplacement</label>
           <select
             value={form.location}
-            onChange={(e) => setForm({ ...form, location: e.target.value as "frigo" | "placard" })}
+            onChange={(e) => setForm({ ...form, location: e.target.value as "frigo" | "placard" | "congelateur" })}
             className="border border-slate-300 rounded-md px-2 py-1.5 text-sm"
           >
             <option value="frigo">Frigo</option>
             <option value="placard">Placard</option>
+            <option value="congelateur">Congélateur</option>
           </select>
         </div>
 
@@ -162,9 +164,10 @@ export default function InventairePage() {
       {loading ? (
         <p className="text-slate-500">Chargement…</p>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <InventoryColumn title="🧊 Frigo" items={frigo} onRemove={removeItem} onUpdateQuantity={updateQuantity} />
           <InventoryColumn title="🗄️ Placards" items={placard} onRemove={removeItem} onUpdateQuantity={updateQuantity} />
+          <InventoryColumn title="🧊 Congélateur" items={congelateur} onRemove={removeItem} onUpdateQuantity={updateQuantity} />
         </div>
       )}
     </div>

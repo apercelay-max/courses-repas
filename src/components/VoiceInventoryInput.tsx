@@ -7,7 +7,7 @@ interface ParsedItem {
   name: string;
   quantity: number;
   unit: string;
-  location: "frigo" | "placard";
+  location: "frigo" | "placard" | "congelateur";
 }
 
 // ---------- Parsing NLP français ----------
@@ -27,8 +27,8 @@ function normalizeUnit(raw: string): string {
 function parsePart(text: string, defaultLoc: "frigo" | "placard"): ParsedItem | null {
   const t = text.trim();
   if (t.length < 2) return null;
-  const loc: "frigo" | "placard" =
-    /#placard/.test(t) ? "placard" : /#frigo/.test(t) ? "frigo" : defaultLoc;
+  const loc: "frigo" | "placard" | "congelateur" =
+    /#congelateur/.test(t) ? "congelateur" : /#placard/.test(t) ? "placard" : /#frigo/.test(t) ? "frigo" : defaultLoc;
   const clean = t.replace(/#(frigo|placard)/g, "").trim();
   if (!clean) return null;
 
@@ -223,6 +223,7 @@ export default function VoiceInventoryInput({ onDone }: { onDone: () => void }) 
                   >
                     <option value="frigo">🧊 Frigo</option>
                     <option value="placard">🗄️ Placard</option>
+                    <option value="congelateur">❄️ Congélateur</option>
                   </select>
                   <button onClick={() => removeItem(idx)} className="text-red-400 hover:text-red-600 text-sm ml-auto">✕</button>
                 </li>
