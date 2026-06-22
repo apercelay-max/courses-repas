@@ -19,6 +19,7 @@ export interface InventoryItem {
   quantity: number;
   unit: string;
   expiryDate: string | null; // YYYY-MM-DD
+  isFavorite?: boolean;
   updatedAt: string;
 }
 

@@ -11,6 +11,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   if (body.unit) item.unit = body.unit;
   if (body.location) item.location = body.location;
   if (body.expiryDate !== undefined) item.expiryDate = body.expiryDate;
+  if (body.isFavorite !== undefined) (item as any).isFavorite = Boolean(body.isFavorite);
   item.updatedAt = nowIso();
 
   await writeDB(db);
