@@ -31,7 +31,11 @@ const MONTHS = [
 ];
 
 function toIso(d: Date): string {
-  return d.toISOString().slice(0, 10);
+  // Utilise le temps LOCAL pour éviter le décalage UTC (ex: UTC+2 à Madrid)
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
 }
 
 export default function CalendrierPage() {
