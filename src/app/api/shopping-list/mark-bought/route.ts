@@ -9,7 +9,7 @@ export async function POST(req: NextRequest) {
     ingredientId: string;
     quantity: number;
     unit: string;
-    location?: "frigo" | "placard";
+    location?: "frigo" | "placard" | "congelateur";
     manualItemId?: string;
   };
 

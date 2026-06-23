@@ -17,8 +17,9 @@ export async function GET(req: NextRequest) {
 // Ajout manuel à la liste de courses (toujours conservé tel quel par le recalcul auto)
 export async function POST(req: NextRequest) {
   const body = await req.json();
-  const { ingredientName, quantity, unit } = body as { ingredientName: string; quantity: number; unit: string };
-  if (!ingredientName || quantity == null || !unit) {
+  const { ingredientName, unit } = body as { ingredientName: string; quantity?: number; unit: string };
+  const quantity = body.quantity ?? 1;
+  if (!ingredientName || !unit) {
     return NextResponse.json({ error: "Champs manquants" }, { status: 400 });
   }
 

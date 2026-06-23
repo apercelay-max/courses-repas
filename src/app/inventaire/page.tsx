@@ -51,13 +51,14 @@ export default function InventairePage() {
 
   async function addItem(e: React.FormEvent) {
     e.preventDefault();
-    if (!form.ingredientName.trim() || !form.quantity) return;
+    if (!form.ingredientName.trim()) return;
+    const qty = form.quantity ? Number(form.quantity) : 1;
     await fetch("/api/inventory", {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({
         ingredientName: form.ingredientName.trim(),
-        quantity: Number(form.quantity),
+        quantity: qty,
         unit: form.unit,
         location: form.location,
         expiryDate: form.expiryDate || null,
