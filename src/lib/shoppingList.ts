@@ -7,6 +7,8 @@ export interface ShoppingListEntry {
   name: string;
   quantity: number;
   unit: string;
+  inStock: number;      // quantité déjà en stock (même si insuffisant)
+  inStockUnit: string;  // unité pour inStock
   source: "auto" | "manual";
   manualItemId?: string;
 }
@@ -23,18 +25,8 @@ export interface ShoppingLists {
   reverse: ReverseListEntry[];
 }
 
-/**
- * Coeur de l'app : compare les ingrédients requis par les repas planifiés
- * (à venir) avec l'inventaire (frigo + placards), et détermine :
- * - toBuy   : ce qui manque (ou est insuffisant) -> à acheter
- * - reverse : ce qui est déjà couvert par le stock -> pas besoin d'acheter
- *
- * Les unités sont regroupées via toComparable() (g, ml, ou "count:<unite>"),
- * donc 200g + 0.3kg sont bien additionnés ensemble.
- */
 export function computeShoppingLists(db: Database, fromDate: string): ShoppingLists {
-  // 1. Besoins agrégés par (ingredientId, clé d'unité)
-  const needed = new Map<string, number>(); // clé = `${ingredientId}__${comparableKey}`
+  const needed = new Map<string, number>();
 
   const upcomingEntries = db.mealPlanEntries.filter((e) => e.plannedDate >= fromDate);
   for (const entry of upcomingEntries) {
@@ -46,7 +38,6 @@ export function computeShoppingLists(db: Database, fromDate: string): ShoppingLi
     }
   }
 
-  // 2. Stock agrégé par (ingredientId, clé d'unité)
   const stock = new Map<string, number>();
   for (const item of db.inventoryItems) {
     const { key, value } = toComparable(item.quantity, item.unit);
@@ -54,7 +45,6 @@ export function computeShoppingLists(db: Database, fromDate: string): ShoppingLi
     stock.set(mapKey, (stock.get(mapKey) ?? 0) + value);
   }
 
-  // 3. Comparaison
   const toBuy: ShoppingListEntry[] = [];
   const reverse: ReverseListEntry[] = [];
 
@@ -66,20 +56,21 @@ export function computeShoppingLists(db: Database, fromDate: string): ShoppingLi
 
     if (missing > 0) {
       const { quantity, unit } = fromComparable(comparableKey, missing);
-      toBuy.push({ ingredientId, name, quantity, unit, source: "auto" });
+      const inStockDisplay = fromComparable(comparableKey, haveValue);
+      toBuy.push({
+        ingredientId, name, quantity, unit,
+        inStock: inStockDisplay.quantity,
+        inStockUnit: inStockDisplay.unit,
+        source: "auto",
+      });
     } else {
       const neededDisplay = fromComparable(comparableKey, neededValue);
       const haveDisplay = fromComparable(comparableKey, haveValue);
-      reverse.push({
-        ingredientId,
-        name,
-        needed: neededDisplay,
-        inStock: haveDisplay,
-      });
+      reverse.push({ ingredientId, name, needed: neededDisplay, inStock: haveDisplay });
     }
   }
 
-  // 4. Ajouts manuels (jamais touchés par le calcul auto)
+  // Ajouts manuels
   for (const item of db.shoppingListItems) {
     if (item.status !== "to_buy") continue;
     toBuy.push({
@@ -87,6 +78,8 @@ export function computeShoppingLists(db: Database, fromDate: string): ShoppingLi
       name: getIngredientName(db, item.ingredientId),
       quantity: item.quantityNeeded,
       unit: item.unit,
+      inStock: 0,
+      inStockUnit: item.unit,
       source: "manual",
       manualItemId: item.id,
     });

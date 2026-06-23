@@ -8,6 +8,8 @@ interface ToBuyEntry {
   name: string;
   quantity: number;
   unit: string;
+  inStock: number;
+  inStockUnit: string;
   source: "auto" | "manual";
   manualItemId?: string;
 }
@@ -25,6 +27,8 @@ export default function CoursesPage() {
   const [loading, setLoading] = useState(true);
   const [showReverse, setShowReverse] = useState(false);
   const [fetchError, setFetchError] = useState("");
+  // Set d'IDs en cours d'animation "acheté"
+  const [checking, setChecking] = useState<Set<string>>(new Set());
 
   const [manualForm, setManualForm] = useState({ ingredientName: "", quantity: "", unit: "piece" });
 
@@ -51,27 +55,27 @@ export default function CoursesPage() {
     await fetch("/api/shopping-list", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({
-        ingredientName: manualForm.ingredientName.trim(),
-        quantity: qty,
-        unit: manualForm.unit,
-      }),
+      body: JSON.stringify({ ingredientName: manualForm.ingredientName.trim(), quantity: qty, unit: manualForm.unit }),
     });
     setManualForm({ ingredientName: "", quantity: "", unit: "piece" });
     load();
   }
 
+  function itemKey(item: ToBuyEntry) {
+    return `${item.ingredientId}-${item.manualItemId ?? "auto"}`;
+  }
+
   async function markBought(item: ToBuyEntry) {
+    const key = itemKey(item);
+    // Animation Apple-style : coche immédiate, disparition après 400ms
+    setChecking((prev) => new Set([...prev, key]));
+    await new Promise((r) => setTimeout(r, 450));
     await fetch("/api/shopping-list/mark-bought", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({
-        ingredientId: item.ingredientId,
-        quantity: item.quantity,
-        unit: item.unit,
-        manualItemId: item.manualItemId,
-      }),
+      body: JSON.stringify({ ingredientId: item.ingredientId, quantity: item.quantity, unit: item.unit, manualItemId: item.manualItemId }),
     });
+    setChecking((prev) => { const n = new Set(prev); n.delete(key); return n; });
     load();
   }
 
@@ -86,9 +90,9 @@ export default function CoursesPage() {
         <h1 className="text-2xl font-bold">Liste de courses</h1>
         <button
           onClick={() => setShowReverse((v) => !v)}
-          className="text-sm px-3 py-1.5 rounded-md border border-slate-300 hover:bg-slate-50 dark:border-slate-600 dark:hover:bg-slate-700"
+          className="text-sm px-3 py-1.5 rounded-md border border-slate-300 dark:border-slate-600 hover:bg-slate-50 dark:hover:bg-slate-700"
         >
-          {showReverse ? "Voir : à acheter" : "Voir : déjà en stock ✅"}
+          {showReverse ? "← Voir : à acheter" : "Voir : déjà en stock ✅"}
         </button>
       </div>
 
@@ -102,39 +106,62 @@ export default function CoursesPage() {
         <ReverseList items={reverse} />
       ) : (
         <>
-          {/* Voix */}
           <VoiceShoppingInput onDone={load} />
 
-          {/* Liste */}
-          <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 p-4">
+          <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 overflow-hidden">
             {toBuy.length === 0 ? (
-              <p className="text-sm text-slate-400 text-center py-4">
-                Rien à acheter pour l&apos;instant. Planifie des repas ou ajoute des articles manuellement.
+              <p className="text-sm text-slate-400 text-center py-8">
+                Rien à acheter. Planifie des repas ou ajoute des articles ci-dessous.
               </p>
             ) : (
               <ul className="divide-y divide-slate-100 dark:divide-slate-700">
-                {toBuy.map((item) => (
-                  <li key={`${item.ingredientId}-${item.manualItemId ?? "auto"}`} className="py-3 flex items-center justify-between gap-2">
-                    <div className="min-w-0">
-                      <span className="font-medium capitalize">{item.name}</span>
-                      <span className="text-slate-500 dark:text-slate-400 text-sm"> — {item.quantity} {item.unit}</span>
-                      {item.source === "manual" && (
-                        <span className="ml-2 text-xs bg-slate-100 dark:bg-slate-700 text-slate-500 rounded px-1.5 py-0.5">manuel</span>
-                      )}
-                    </div>
-                    <div className="flex items-center gap-2 flex-shrink-0">
+                {toBuy.map((item) => {
+                  const key = itemKey(item);
+                  const isChecking = checking.has(key);
+                  const hasPartialStock = item.inStock > 0;
+
+                  return (
+                    <li
+                      key={key}
+                      className={`px-4 py-3 flex items-center gap-3 transition-all duration-300 ${
+                        isChecking ? "opacity-40" : ""
+                      } ${hasPartialStock ? "bg-amber-50 dark:bg-amber-950" : ""}`}
+                    >
+                      {/* Bouton cercle style Apple */}
                       <button
                         onClick={() => markBought(item)}
-                        className="text-xs bg-green-50 dark:bg-green-900 text-green-700 dark:text-green-300 rounded px-2 py-1 hover:bg-green-100 dark:hover:bg-green-800 whitespace-nowrap"
+                        className={`w-7 h-7 rounded-full border-2 flex-shrink-0 flex items-center justify-center transition-all duration-200 ${
+                          isChecking
+                            ? "bg-green-500 border-green-500 scale-110"
+                            : "border-slate-300 dark:border-slate-500 hover:border-green-400 dark:hover:border-green-500"
+                        }`}
                       >
-                        ✓ Acheté
+                        {isChecking && (
+                          <svg className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                          </svg>
+                        )}
                       </button>
-                      {item.source === "manual" && item.manualItemId && (
-                        <button onClick={() => removeManual(item.manualItemId!)} className="text-slate-400 hover:text-red-600 text-sm">✕</button>
+
+                      <div className={`flex-1 min-w-0 ${isChecking ? "line-through" : ""}`}>
+                        <span className="font-medium capitalize">{item.name}</span>
+                        <span className="text-slate-500 dark:text-slate-400 text-sm"> — {item.quantity} {item.unit}</span>
+                        {item.source === "manual" && (
+                          <span className="ml-2 text-xs bg-slate-100 dark:bg-slate-700 text-slate-500 rounded px-1.5 py-0.5">manuel</span>
+                        )}
+                        {hasPartialStock && (
+                          <div className="text-xs text-amber-700 dark:text-amber-400 mt-0.5">
+                            ⚠️ Tu en as déjà {item.inStock} {item.inStockUnit} en stock
+                          </div>
+                        )}
+                      </div>
+
+                      {item.source === "manual" && item.manualItemId && !isChecking && (
+                        <button onClick={() => removeManual(item.manualItemId!)} className="text-slate-300 dark:text-slate-600 hover:text-red-500 text-lg flex-shrink-0">✕</button>
                       )}
-                    </div>
-                  </li>
-                ))}
+                    </li>
+                  );
+                })}
               </ul>
             )}
           </div>
@@ -153,30 +180,22 @@ export default function CoursesPage() {
                 />
               </div>
               <div className="flex flex-col">
-                <label className="text-xs text-slate-500 mb-1">Quantité (optionnel)</label>
-                <input
-                  type="number"
-                  step="any"
-                  min="0"
-                  value={manualForm.quantity}
-                  placeholder="1"
+                <label className="text-xs text-slate-500 mb-1">Qté (optionnel)</label>
+                <input type="number" step="any" min="0" value={manualForm.quantity} placeholder="1"
                   onChange={(e) => setManualForm({ ...manualForm, quantity: e.target.value })}
                   className="border border-slate-300 rounded-md px-2 py-1.5 text-sm w-24"
                 />
               </div>
               <div className="flex flex-col">
                 <label className="text-xs text-slate-500 mb-1">Unité</label>
-                <select
-                  value={manualForm.unit}
-                  onChange={(e) => setManualForm({ ...manualForm, unit: e.target.value })}
-                  className="border border-slate-300 rounded-md px-2 py-1.5 text-sm"
-                >
-                  {["piece", "g", "kg", "ml", "L", "boite", "tranche", "gousse", "sachet", "pot"].map((u) => (
+                <select value={manualForm.unit} onChange={(e) => setManualForm({ ...manualForm, unit: e.target.value })}
+                  className="border border-slate-300 rounded-md px-2 py-1.5 text-sm">
+                  {["piece","g","kg","ml","L","boite","tranche","gousse","sachet","pot"].map((u) => (
                     <option key={u} value={u}>{u}</option>
                   ))}
                 </select>
               </div>
-              <button type="submit" className="bg-blue-600 text-white rounded-md px-4 py-1.5 text-sm font-medium hover:bg-blue-700">
+              <button type="submit" className="bg-indigo-600 text-white rounded-md px-4 py-1.5 text-sm font-medium hover:bg-indigo-700">
                 Ajouter
               </button>
             </div>
@@ -190,11 +209,9 @@ export default function CoursesPage() {
 function ReverseList({ items }: { items: ReverseEntry[] }) {
   return (
     <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 p-4">
-      <p className="text-sm text-slate-500 mb-3">
-        Ces ingrédients sont couverts par ton stock — pas besoin de les acheter.
-      </p>
+      <p className="text-sm text-slate-500 mb-3">Ingrédients couverts par ton stock — pas besoin de les acheter.</p>
       {items.length === 0 ? (
-        <p className="text-sm text-slate-400 text-center py-4">Rien à afficher (planifie des repas pour voir ce qui est couvert).</p>
+        <p className="text-sm text-slate-400 text-center py-4">Planifie des repas pour voir ce qui est déjà couvert.</p>
       ) : (
         <div className="overflow-x-auto">
           <table className="w-full text-sm">

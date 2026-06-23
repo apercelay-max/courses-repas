@@ -26,7 +26,7 @@ export default async function HomePage() {
     {
       id: "repas",
       href: "/calendrier",
-      title: "Repas planifiés",
+      title: "Repas",
       value: `${upcomingMeals}`,
       sub: "repas à venir",
       emoji: "📅",
@@ -34,9 +34,9 @@ export default async function HomePage() {
     {
       id: "acheter",
       href: "/courses",
-      title: "À acheter",
+      title: "Courses",
       value: `${toBuy.length}`,
-      sub: "ingrédients manquants",
+      sub: "ingrédients à acheter",
       emoji: "🛒",
     },
     {
@@ -49,5 +49,18 @@ export default async function HomePage() {
     },
   ];
 
-  return <HomeClient cards={cards} />;
+  // Favoris : ingrédients marqués ⭐ avec leur stock actuel
+  const ingredientMap = new Map(db.ingredients.map((i) => [i.id, i.canonicalName]));
+  const favorites = db.inventoryItems
+    .filter((i) => i.isFavorite)
+    .map((i) => ({
+      id: i.id,
+      ingredientId: i.ingredientId,
+      ingredientName: ingredientMap.get(i.ingredientId) ?? i.ingredientId,
+      location: i.location as "frigo" | "placard" | "congelateur",
+      quantity: i.quantity,
+      unit: i.unit,
+    }));
+
+  return <HomeClient cards={cards} favorites={favorites} />;
 }

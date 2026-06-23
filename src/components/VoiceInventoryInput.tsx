@@ -12,8 +12,6 @@ interface ParsedItem {
   location: Loc;
 }
 
-// ---------- Parsing NLP français amélioré ----------
-
 function normalizeUnit(raw: string): string {
   const u = raw.toLowerCase().trim();
   if (/^(g|gramme?s?)$/.test(u)) return "g";
@@ -34,7 +32,6 @@ function parseQuantity(raw: string): number {
   if (/demi/.test(s)) return 0.5;
   if (/quart/.test(s)) return 0.25;
   if (/douzaine/.test(s)) return 12;
-  if (/demi.douzaine/.test(s)) return 6;
   const n = parseFloat(s);
   return isNaN(n) ? 1 : n;
 }
@@ -42,21 +39,11 @@ function parseQuantity(raw: string): number {
 function parsePart(text: string, defaultLoc: Loc): ParsedItem | null {
   const t = text.trim();
   if (t.length < 2) return null;
-
-  const loc: Loc =
-    /#congelateur/.test(t) ? "congelateur"
-    : /#placard/.test(t) ? "placard"
-    : /#frigo/.test(t) ? "frigo"
-    : defaultLoc;
-
-  // Retire TOUS les tags de localisation
+  const loc: Loc = /#congelateur/.test(t) ? "congelateur" : /#placard/.test(t) ? "placard" : /#frigo/.test(t) ? "frigo" : defaultLoc;
   const clean = t.replace(/#(frigo|placard|congelateur)/g, "").trim();
   if (!clean) return null;
 
-  // Motif avec quantité numérique : "500g de pâtes", "2 litres de lait"
-  const numMatch = clean.match(
-    /^(\d+(?:[.,]\d+)?)\s*(grammes?|g|kilos?|kg|kilogrammes?|litres?|l(?![a-z])|ml|millilitre?s?|cl|centilitre?s?|boîtes?|boites?|tranches?|gousses?|sachets?|pots?|pièces?|pieces?)?\s*(?:de\s+|d[u']\s*|de la\s+|des\s+)?(.+)/i
-  );
+  const numMatch = clean.match(/^(\d+(?:[.,]\d+)?)\s*(grammes?|g|kilos?|kg|kilogrammes?|litres?|l(?![a-z])|ml|millilitre?s?|cl|centilitre?s?|boîtes?|boites?|tranches?|gousses?|sachets?|pots?|pièces?|pieces?)?\s*(?:de\s+|d[u']\s*|de la\s+|des\s+)?(.+)/i);
   if (numMatch) {
     const qty = parseFloat(numMatch[1].replace(",", "."));
     const unit = normalizeUnit(numMatch[2] || "piece");
@@ -64,10 +51,7 @@ function parsePart(text: string, defaultLoc: Loc): ParsedItem | null {
     if (name.length > 1) return { name, quantity: qty, unit, location: loc };
   }
 
-  // Quantité en toutes lettres : "une douzaine d'oeufs", "un demi kilo de beurre"
-  const wordQtyMatch = clean.match(
-    /^(un(?:e)?\s+(?:demi(?:-douzaine|)?|quart|douzaine)|demi(?:-douzaine)?|quart|douzaine)\s+(?:de\s+|d[u']\s*|de la\s+|des\s+)?(.+)/i
-  );
+  const wordQtyMatch = clean.match(/^(un(?:e)?\s+(?:demi(?:-douzaine|)?|quart|douzaine)|demi(?:-douzaine)?|quart|douzaine)\s+(?:de\s+|d[u']\s*|de la\s+|des\s+)?(.+)/i);
   if (wordQtyMatch) {
     const qty = parseQuantity(wordQtyMatch[1]);
     const name = wordQtyMatch[2].replace(/\s*#\w+/g, "").trim();
@@ -75,10 +59,7 @@ function parsePart(text: string, defaultLoc: Loc): ParsedItem | null {
     if (name.length > 1) return { name, quantity: qty, unit, location: loc };
   }
 
-  // Pas de quantité : "du lait", "des pâtes", "lait"
-  const noQtyMatch = clean.match(
-    /^(?:du\s+|de la\s+|de l['']|d['']|des\s+|un peu de\s+|un\s+|une\s+)?(.+)/i
-  );
+  const noQtyMatch = clean.match(/^(?:du\s+|de la\s+|de l['']|d['']|des\s+|un peu de\s+|un\s+|une\s+)?(.+)/i);
   if (noQtyMatch) {
     const name = noQtyMatch[1].replace(/\s*#\w+/g, "").trim();
     if (name.length > 1) return { name, quantity: 1, unit: "piece", location: loc };
@@ -88,98 +69,54 @@ function parsePart(text: string, defaultLoc: Loc): ParsedItem | null {
 
 function parseTranscript(raw: string): ParsedItem[] {
   let text = raw.toLowerCase()
-    // Normalise les apostrophes
     .replace(/['']/g, "'")
-    // Localisation → tags
     .replace(/(?:dans le?|au?)\s+(congélateur|congel|congélo|freezer)/g, "#congelateur")
     .replace(/(?:dans le?|au?)\s+(frigo|réfrigérateur|frigidaire|réfrig|frais)/g, "#frigo")
     .replace(/(?:dans le?s?|au?)\s+(placard|garde-manger|réserve|cuisine)/g, "#placard")
-    // Mots parasites en début
     .replace(/^(?:alors\s+|bon\s+|voilà\s+|voila\s+|donc\s+|ok\s+)+/, "")
-    .replace(/^(?:j['']ai\s+|j ai\s+|il y a\s+)+/, "")
-    .replace(/^(?:acheté\s+|achète\s+|ajouté\s+|ajoute\s+|mis\s+)+/, "");
+    .replace(/^(?:j['']ai\s+|il y a\s+|acheté\s+|achète\s+|ajouté\s+|ajoute\s+|mis\s+)+/, "");
 
-  const defaultLoc: Loc =
-    /acheté|fait les courses|épicerie|supermarché/.test(raw.toLowerCase()) ? "placard" : "frigo";
-
-  // Séparateurs
+  const defaultLoc: Loc = /acheté|fait les courses|épicerie|supermarché/.test(raw.toLowerCase()) ? "placard" : "frigo";
   const parts = text.split(/\s*,\s*|\s+et\s+|\s+puis\s+|\s+aussi\s+|\s+ainsi que\s+/);
-
-  return parts
-    .map((p) => parsePart(p.trim(), defaultLoc))
-    .filter((x): x is ParsedItem => x !== null && x.name.length > 1);
+  return parts.map((p) => parsePart(p.trim(), defaultLoc)).filter((x): x is ParsedItem => x !== null && x.name.length > 1);
 }
 
-// ---------- Composant ----------
-
 const UNITS = ["g", "kg", "ml", "L", "piece", "gousse", "tranche", "boite", "sachet", "pot"];
-const LOC_LABELS: Record<Loc, string> = { frigo: "🧊 Frigo", placard: "🗄️ Placard", congelateur: "❄️ Congélateur" };
+const LOC_LABELS: Record<Loc, string> = { frigo: "🧊 Frigo", placard: "🗄️ Placard", congelateur: "❄️ Congél." };
+const LOC_COLORS: Record<Loc, string> = { frigo: "bg-blue-100 text-blue-700", placard: "bg-slate-100 text-slate-700", congelateur: "bg-cyan-100 text-cyan-700" };
 
 export default function VoiceInventoryInput({ onDone }: { onDone: () => void }) {
   const [state, setState] = useState<"idle" | "listening" | "confirm" | "saving">("idle");
   const [transcript, setTranscript] = useState("");
   const [interim, setInterim] = useState("");
   const [items, setItems] = useState<ParsedItem[]>([]);
+  const [expandedIdx, setExpandedIdx] = useState<number | null>(null);
   const [error, setError] = useState("");
   const recRef = useRef<any>(null);
 
   function startListening() {
-    setError("");
-    setInterim("");
+    setError(""); setInterim("");
     const SR = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-    if (!SR) {
-      setError("Votre navigateur ne supporte pas la voix. Utilisez Chrome ou Safari.");
-      return;
-    }
+    if (!SR) { setError("Votre navigateur ne supporte pas la voix. Utilisez Chrome ou Safari."); return; }
     const rec = new SR();
-    rec.lang = "fr-FR";
-    rec.continuous = false;
-    rec.interimResults = true; // Résultats en temps réel
-
+    rec.lang = "fr-FR"; rec.continuous = false; rec.interimResults = true;
     rec.onresult = (e: any) => {
-      let final = "";
-      let inter = "";
+      let final = "", inter = "";
       for (let i = e.resultIndex; i < e.results.length; i++) {
         if (e.results[i].isFinal) final += e.results[i][0].transcript;
         else inter += e.results[i][0].transcript;
       }
       if (inter) setInterim(inter);
-      if (final) {
-        setTranscript(final);
-        setInterim("");
-        setItems(parseTranscript(final));
-        setState("confirm");
-      }
+      if (final) { setTranscript(final); setInterim(""); setItems(parseTranscript(final)); setState("confirm"); }
     };
-
-    rec.onerror = (e: any) => {
-      if (e.error === "no-speech") setError("Rien entendu. Réessaie.");
-      else setError(`Erreur micro (${e.error}). Réessaie.`);
-      setState("idle");
-    };
-
-    rec.onend = () => {
-      if (state === "listening") setState("idle");
-    };
-
-    recRef.current = rec;
-    rec.start();
-    setState("listening");
+    rec.onerror = (e: any) => { setError(e.error === "no-speech" ? "Rien entendu. Réessaie." : `Erreur micro (${e.error}).`); setState("idle"); };
+    rec.onend = () => { if (state === "listening") setState("idle"); };
+    recRef.current = rec; rec.start(); setState("listening");
   }
 
-  function stopListening() {
-    recRef.current?.stop();
-    setState("idle");
-    setInterim("");
-  }
-
-  function updateItem(idx: number, patch: Partial<ParsedItem>) {
-    setItems((prev) => prev.map((it, i) => (i === idx ? { ...it, ...patch } : it)));
-  }
-
-  function removeItem(idx: number) {
-    setItems((prev) => prev.filter((_, i) => i !== idx));
-  }
+  function stopListening() { recRef.current?.stop(); setState("idle"); setInterim(""); }
+  function updateItem(idx: number, patch: Partial<ParsedItem>) { setItems((p) => p.map((it, i) => i === idx ? { ...it, ...patch } : it)); }
+  function removeItem(idx: number) { setItems((p) => p.filter((_, i) => i !== idx)); }
 
   async function confirm() {
     setState("saving");
@@ -187,29 +124,13 @@ export default function VoiceInventoryInput({ onDone }: { onDone: () => void }) 
       await fetch("/api/inventory", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          ingredientName: item.name,
-          quantity: item.quantity,
-          unit: item.unit,
-          location: item.location,
-          expiryDate: null,
-        }),
+        body: JSON.stringify({ ingredientName: item.name, quantity: item.quantity, unit: item.unit, location: item.location, expiryDate: null }),
       });
     }
-    setState("idle");
-    setTranscript("");
-    setItems([]);
-    onDone();
+    setState("idle"); setTranscript(""); setItems([]); onDone();
   }
 
-  function reset() {
-    recRef.current?.stop();
-    setState("idle");
-    setTranscript("");
-    setInterim("");
-    setItems([]);
-    setError("");
-  }
+  function reset() { recRef.current?.stop(); setState("idle"); setTranscript(""); setInterim(""); setItems([]); setError(""); }
 
   return (
     <div className="bg-gradient-to-br from-violet-50 to-indigo-50 dark:from-violet-950 dark:to-indigo-950 border border-violet-200 dark:border-violet-800 rounded-xl p-4">
@@ -221,12 +142,10 @@ export default function VoiceInventoryInput({ onDone }: { onDone: () => void }) 
       {state === "idle" && (
         <div className="flex flex-col items-center gap-3">
           <p className="text-sm text-slate-500 text-center">
-            Ex : <em>&ldquo;500g de pâtes dans le placard, du lait et 6 oeufs dans le frigo&rdquo;</em>
+            Ex : <em>&ldquo;500g de pâtes dans le placard, du lait au frigo&rdquo;</em>
           </p>
-          <button
-            onClick={startListening}
-            className="w-16 h-16 rounded-full bg-violet-600 hover:bg-violet-700 text-white flex items-center justify-center shadow-lg text-2xl transition active:scale-95"
-          >
+          <button onClick={startListening}
+            className="w-16 h-16 rounded-full bg-violet-600 hover:bg-violet-700 text-white flex items-center justify-center shadow-lg text-2xl transition active:scale-95">
             🎤
           </button>
           {error && <p className="text-red-500 text-sm text-center">{error}</p>}
@@ -237,24 +156,11 @@ export default function VoiceInventoryInput({ onDone }: { onDone: () => void }) 
         <div className="flex flex-col items-center gap-3">
           <div className="flex gap-1 items-end h-8">
             {[4,7,5,9,6,8,4,6,9,5].map((h, i) => (
-              <div key={i}
-                className="w-1.5 bg-violet-500 rounded-full animate-pulse"
-                style={{ height: `${h * 3}px`, animationDelay: `${i * 0.1}s` }}
-              />
+              <div key={i} className="w-1.5 bg-violet-500 rounded-full animate-pulse" style={{ height: `${h * 3}px`, animationDelay: `${i * 0.1}s` }} />
             ))}
           </div>
-          {interim && (
-            <p className="text-sm text-violet-700 dark:text-violet-300 italic text-center max-w-xs">
-              &ldquo;{interim}&rdquo;
-            </p>
-          )}
-          <button
-            onClick={stopListening}
-            className="w-14 h-14 rounded-full bg-red-500 hover:bg-red-600 text-white flex items-center justify-center shadow text-xl active:scale-95"
-          >
-            ⏹️
-          </button>
-          <p className="text-xs text-slate-400">Parle, puis arrête quand tu as fini</p>
+          {interim && <p className="text-sm text-violet-700 dark:text-violet-300 italic text-center max-w-xs">&ldquo;{interim}&rdquo;</p>}
+          <button onClick={stopListening} className="w-14 h-14 rounded-full bg-red-500 hover:bg-red-600 text-white flex items-center justify-center shadow text-xl active:scale-95">⏹️</button>
         </div>
       )}
 
@@ -262,54 +168,42 @@ export default function VoiceInventoryInput({ onDone }: { onDone: () => void }) 
         <div className="space-y-3">
           <p className="text-xs text-slate-400 italic">&ldquo;{transcript}&rdquo;</p>
           {items.length === 0 ? (
-            <div className="text-sm text-center space-y-2">
-              <p className="text-red-500">Rien compris. Réessaie en parlant clairement.</p>
-              <p className="text-slate-400 text-xs">Conseil : parle lentement, dis les unités clairement (grammes, kilos…)</p>
-            </div>
+            <p className="text-red-500 text-sm text-center">Rien compris. Réessaie.</p>
           ) : (
             <ul className="space-y-2">
               {items.map((item, idx) => (
-                <li key={idx} className="flex flex-wrap gap-2 items-center bg-white dark:bg-slate-800 rounded-lg px-3 py-2 border border-slate-200 dark:border-slate-700">
-                  <input
-                    className="border border-slate-300 rounded px-2 py-1 text-sm w-32 capitalize"
-                    value={item.name}
-                    onChange={(e) => updateItem(idx, { name: e.target.value })}
-                  />
-                  <input
-                    type="number"
-                    className="border border-slate-300 rounded px-2 py-1 text-sm w-16"
-                    value={item.quantity}
-                    min={0}
-                    step="any"
-                    onChange={(e) => updateItem(idx, { quantity: Number(e.target.value) })}
-                  />
-                  <select
-                    className="border border-slate-300 rounded px-2 py-1 text-sm"
-                    value={item.unit}
-                    onChange={(e) => updateItem(idx, { unit: e.target.value })}
-                  >
-                    {UNITS.map((u) => <option key={u} value={u}>{u}</option>)}
-                  </select>
-                  <select
-                    className="border border-slate-300 rounded px-2 py-1 text-sm"
-                    value={item.location}
-                    onChange={(e) => updateItem(idx, { location: e.target.value as Loc })}
-                  >
-                    {(Object.entries(LOC_LABELS) as [Loc, string][]).map(([v, l]) => (
-                      <option key={v} value={v}>{l}</option>
-                    ))}
-                  </select>
-                  <button onClick={() => removeItem(idx)} className="text-red-400 hover:text-red-600 text-sm ml-auto">✕</button>
+                <li key={idx} className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 overflow-hidden">
+                  {/* Ligne principale : nom + badges */}
+                  <div className="flex items-center gap-2 px-3 py-2.5">
+                    <span className="font-semibold capitalize flex-1 text-slate-800 dark:text-slate-100">{item.name}</span>
+                    <span className="text-xs text-slate-500">{item.quantity} {item.unit}</span>
+                    <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${LOC_COLORS[item.location]}`}>{LOC_LABELS[item.location]}</span>
+                    <button onClick={() => setExpandedIdx(expandedIdx === idx ? null : idx)}
+                      className="text-slate-400 hover:text-slate-600 text-sm px-1">✏️</button>
+                    <button onClick={() => removeItem(idx)} className="text-slate-300 hover:text-red-500 text-lg">✕</button>
+                  </div>
+                  {/* Édition dépliable */}
+                  {expandedIdx === idx && (
+                    <div className="flex flex-wrap gap-2 px-3 pb-3 pt-1 border-t border-slate-100 dark:border-slate-700 bg-slate-50 dark:bg-slate-900">
+                      <input className="border border-slate-300 rounded px-2 py-1 text-sm flex-1 min-w-28 capitalize"
+                        value={item.name} onChange={(e) => updateItem(idx, { name: e.target.value })} />
+                      <input type="number" className="border border-slate-300 rounded px-2 py-1 text-sm w-16"
+                        value={item.quantity} min={0} step="any" onChange={(e) => updateItem(idx, { quantity: Number(e.target.value) })} />
+                      <select className="border border-slate-300 rounded px-2 py-1 text-sm" value={item.unit} onChange={(e) => updateItem(idx, { unit: e.target.value })}>
+                        {UNITS.map((u) => <option key={u} value={u}>{u}</option>)}
+                      </select>
+                      <select className="border border-slate-300 rounded px-2 py-1 text-sm" value={item.location} onChange={(e) => updateItem(idx, { location: e.target.value as Loc })}>
+                        {(Object.entries(LOC_LABELS) as [Loc, string][]).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+                      </select>
+                    </div>
+                  )}
                 </li>
               ))}
             </ul>
           )}
-          <div className="flex gap-2 mt-2 flex-wrap">
-            <button
-              onClick={confirm}
-              disabled={items.length === 0 || state === "saving"}
-              className="bg-violet-600 hover:bg-violet-700 disabled:opacity-50 text-white rounded-lg px-4 py-2 text-sm font-medium"
-            >
+          <div className="flex gap-2 flex-wrap">
+            <button onClick={confirm} disabled={items.length === 0 || state === "saving"}
+              className="bg-violet-600 hover:bg-violet-700 disabled:opacity-50 text-white rounded-lg px-4 py-2 text-sm font-medium">
               {state === "saving" ? "Ajout…" : `✅ Ajouter ${items.length} ingrédient${items.length > 1 ? "s" : ""}`}
             </button>
             <button onClick={reset} className="text-slate-500 hover:text-slate-700 text-sm px-3 py-2">Annuler</button>
