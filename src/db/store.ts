@@ -23,7 +23,12 @@ function getSql() {
     if (!rawUrl) throw new Error("DATABASE_URL non défini");
     // Nettoyage : supprime espaces, retours à la ligne et guillemets qui
     // peuvent s'introduire lors d'un copier-coller dans Vercel.
-    const url = rawUrl.replace(/\s+/g, "").replace(/^["']+|["']+$/g, "");
+    let url = rawUrl.replace(/\s+/g, "").replace(/^["']+|["']+$/g, "");
+    // Répare un "@" manquant avant l'hôte du pooler Supabase
+    // (arrive quand le "@" est effacé en collant le mot de passe).
+    if (!url.includes("@")) {
+      url = url.replace(/(aws-\d+-[a-z0-9-]+\.pooler\.supabase\.com)/, "@$1");
+    }
     const parsed = new URL(url);
     global.__pgClient = postgres({
       host: parsed.hostname,
